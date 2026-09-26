@@ -55,4 +55,7 @@ dependencies {
     implementation(libs.compose.material.icons)
 
     implementation(libs.openmapview)
+
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
 }

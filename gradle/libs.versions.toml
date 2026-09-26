@@ -4,11 +4,14 @@ coreKtx = "1.10.1"
 junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
+ktorClientCio = "ktor_version"
+ktorClientCore = "ktor_version"
 lifecycleRuntimeKtx = "2.6.1"
 activityCompose = "1.8.0"
 kotlin = "2.2.10"
 composeBom = "2025.12.00"
 openmapview = "0.13.3"
+ktor_version = "3.6.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -27,6 +30,10 @@ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-te
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-compose-material3-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite" }
 compose-material-icons = { group = "androidx.compose.material", name = "material-icons-core" }
+
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor_version" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor_version" }
+
 openmapview = { module = "de.afarber:openmapview", version.ref = "openmapview" }
 
 [plugins]
