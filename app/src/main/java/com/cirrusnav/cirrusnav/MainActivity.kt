@@ -179,29 +179,27 @@ fun OverlayControls(
             style = MaterialTheme.typography.titleMedium,
         )
 
-        PrepPath()
+        ChangingTextButton()
     }
 
 }
 
 
-@Composable
-fun PrepPath() {
-    var clicked by remember { mutableStateOf("Click Me") }
 
-    Button(
-        onClick = {
-            clicked = "Clicked"
-        }
-    )
-    {
-        Text(text = clicked)
+fun PrepPath(): String {
+    var clicked = "NotClicked"
+    var isClicked = false
+    isClicked = true
+    if( isClicked == true){
+        clicked = "Clicked"
+        return clicked
+    }
+    else{
+        return clicked
     }
 
 }
 
-
-//Button test
 @Composable
 fun ChangingTextButton() {
 
