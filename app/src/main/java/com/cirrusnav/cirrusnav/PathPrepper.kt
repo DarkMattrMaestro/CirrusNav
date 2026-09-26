@@ -18,13 +18,19 @@ enum class TransportationMode(val representation: String) {
     DRIVING_CAR("driving-car")
 }
 
+data class RouteResult(
+    val polylines: List<de.afarber.openmapview.Polyline>,
+    val durationSeconds: Double,
+    val distanceMeters: Double
+)
+
 class PathPrepper {
     private val client = HttpClient(CIO)
 
     /**
      * Fetches a route from ORS Directions API between Keep.startPos and Keep.destPos.
      */
-    suspend fun getRoute(): GeoJsonResult? {
+    suspend fun getRoute(): RouteResult? {
         val start = Keep.startPos ?: run {
             Log.e(TAG, "getRoute: startPos is null")
             return null
@@ -67,8 +73,18 @@ class PathPrepper {
             val features = json.getJSONArray("features")
             val polylines = mutableListOf<de.afarber.openmapview.Polyline>()
             
+            var totalDuration = 0.0
+            var totalDistance = 0.0
+            
             for (i in 0 until features.length()) {
                 val feature = features.getJSONObject(i)
+                val properties = feature.optJSONObject("properties")
+                val summary = properties?.optJSONObject("summary")
+                if (summary != null) {
+                    totalDuration += summary.optDouble("duration", 0.0)
+                    totalDistance += summary.optDouble("distance", 0.0)
+                }
+
                 val geometry = feature.optJSONObject("geometry") ?: continue
                 if (geometry.optString("type") == "LineString") {
                     val coordinates = geometry.getJSONArray("coordinates")
@@ -84,8 +100,8 @@ class PathPrepper {
                 }
             }
             
-            val result = GeoJsonResult(polylines = polylines)
-            Log.d(TAG, "Parsed: ${result.polylines.size} polylines (bypassed GeoJsonParser)")
+            val result = RouteResult(polylines, totalDuration, totalDistance)
+            Log.d(TAG, "Parsed: ${result.polylines.size} polylines, duration=${totalDuration}s")
             result
         } catch (e: Exception) {
             Log.e(TAG, "JSON parse error: ${e.message}", e)

@@ -216,7 +216,7 @@ fun RouteControls(
                         statusText = "Fetching route..."
 
                         // Get route from ORS Directions API
-                        val result: GeoJsonResult? = withContext(Dispatchers.IO) {
+                        val result: RouteResult? = withContext(Dispatchers.IO) {
                             pathPrepper.getRoute()
                         }
 
@@ -237,7 +237,18 @@ fun RouteControls(
                                 map.setCenter(LatLng(startCoord.latitude, startCoord.longitude))
                                 map.setZoom(8.0f)
                             }
-                            statusText = "Route found! ${result.polylines.first().points.size} points"
+                            
+                            val durationHours = (result.durationSeconds / 3600).toInt()
+                            val durationMinutes = ((result.durationSeconds % 3600) / 60).toInt()
+                            val distanceKm = result.distanceMeters / 1000.0
+                            val distanceStr = String.format(java.util.Locale.US, "%.1f km", distanceKm)
+                            
+                            var timeStr = ""
+                            if (durationHours > 0) timeStr += "${durationHours}h "
+                            timeStr += "${durationMinutes}m"
+
+                            statusText = "Route found! $timeStr ($distanceStr)"
+                            //statusText = "Route found! $timeStr ($distanceStr) - ${result.polylines.first().points.size} points"
                         } else {
                             statusText = "No route found"
                         }
