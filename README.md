@@ -18,3 +18,25 @@ Safely travel and account for the unpredictability of weather
       - https://weathermaps.weatherapi.com/precip/tiles/map.html
 - [ ] GPS Position
       - ???
+
+### Challenges
+- https://hack-the-hill-iii.devpost.com/ 
+- [ ] Best UI/UX Project
+      - Is it pretty?
+- [ ] Best Hardware Hack 
+- [ ] MLH Best Use of ElevenLabs
+      - Human sounding audio
+- [ ] MLH Best Use of Gemini API
+- [ ] MLH Best Use of Solana
+- [ ] MLH Best Use of Tiger Data
+- [ ] MLH Best Use of Presage
+- [ ] MLH Best Use of Vultr
+- [ ] MLH Best Use of Autho0
+- [ ] MLH Best Domain Name from GoDaddy Registry
+- [ ] CGI Challenge — The Northwind Brief
+- [ ] Civic Technology
+- [ ] General Challenge — Best Overall
+- [ ] MathemaTech - Best Educational Project
+      - Teach about clouds/weather
+- [ ] Best OSS Project
+      - open source
