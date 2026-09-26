@@ -1,5 +1,6 @@
 package com.cirrusnav.cirrusnav
 
+import android.R
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
@@ -177,5 +178,40 @@ fun OverlayControls(
             text = "Title of lower section",
             style = MaterialTheme.typography.titleMedium,
         )
+
+        PrepPath()
+    }
+
+}
+
+
+@Composable
+fun PrepPath() {
+    var clicked by remember { mutableStateOf("Click Me") }
+
+    Button(
+        onClick = {
+            clicked = "Clicked"
+        }
+    )
+    {
+        Text(text = clicked)
+    }
+
+}
+
+@Composable
+fun ChangingTextButton() {
+
+    var buttonText by remember { mutableStateOf("Click Me") }
+
+
+    Button(
+        onClick = {
+
+            buttonText = "Clicked!"
+        }
+    ) {
+        Text(text = buttonText)
     }
 }
