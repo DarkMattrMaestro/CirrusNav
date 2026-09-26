@@ -5,12 +5,13 @@ Safely travel and account for the unpredictability of weather
 ### MVP
 - [x] Map
       - https://github.com/afarber/OpenMapView
-- [ ] Path to destination
+- [x] Path to destination
       - (Google Maps or alt?)
-- [ ] Time estimate along path (allow dynamic updating)
-      - ???
-- [ ] Weather at each position on the route, accounting for time
+- [X] Time estimate along path (allow dynamic updating)
+      - Weather at location X time away
+- [X] Weather at each position on the route, accounting for time
       - https://www.weatherapi.com/pricing.aspx
+      - Only for certain points. 33, 66, 100%
 
 ### Extending
 - [ ] Overlay weather map over time
