@@ -1,8 +1,8 @@
 package com.cirrusnav.cirrusnav
 
 class GeoCoord {
-    val longitude: Double? = null
-    val latitude: Double? = null
+    var longitude: Double? = null
+    var latitude: Double? = null
 
     fun isValid(): Boolean {
         return longitude != null && latitude != null

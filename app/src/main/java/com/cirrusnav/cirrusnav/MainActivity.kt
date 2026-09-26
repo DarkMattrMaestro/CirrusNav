@@ -1,6 +1,7 @@
 package com.cirrusnav.cirrusnav
 
 import android.R
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
@@ -55,6 +56,10 @@ import de.afarber.openmapview.LatLng
 import de.afarber.openmapview.OpenMapView
 import de.afarber.openmapview.PredefinedTileProviders
 import de.afarber.openmapview.TileOverlay
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlin.time.Clock
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -179,16 +184,28 @@ fun OverlayControls(
             style = MaterialTheme.typography.titleMedium,
         )
 
-        ChangingTextButton()
+        PrepPath()
     }
 
 }
 
 
+@SuppressLint("CoroutineCreationDuringComposition")
 @Composable
 fun PrepPath(){
     var clicked by remember { mutableStateOf("Click Me") }
 
+    val pathprepper = PathPrepper()
+
+    val scope = CoroutineScope(Dispatchers.Default)
+
+    pathprepper.setRoute()
+    scope.launch {
+        val route = pathprepper.getRoute()
+        System.out.println("JEEEJEEE: $route" )
+    }
+
+    Thread.sleep(2000)
     Button(
         onClick = {
 
@@ -196,6 +213,7 @@ fun PrepPath(){
         }
     ) {
         Text(text = clicked)
+
     }
 
 }
