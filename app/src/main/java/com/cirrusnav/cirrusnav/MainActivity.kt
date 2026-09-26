@@ -185,20 +185,22 @@ fun OverlayControls(
 }
 
 
+@Composable
+fun PrepPath(){
+    var clicked by remember { mutableStateOf("Click Me") }
 
-fun PrepPath(): String {
-    var clicked = "NotClicked"
-    var isClicked = false
-    isClicked = true
-    if( isClicked == true){
-        clicked = "Clicked"
-        return clicked
-    }
-    else{
-        return clicked
+    Button(
+        onClick = {
+
+            clicked = "Clicked!"
+        }
+    ) {
+        Text(text = clicked)
     }
 
 }
+
+
 
 @Composable
 fun ChangingTextButton() {
