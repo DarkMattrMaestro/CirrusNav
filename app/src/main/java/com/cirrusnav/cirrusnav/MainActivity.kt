@@ -221,23 +221,6 @@ fun RouteControls(
                         }
 
                         if (result != null && result.polylines.isNotEmpty()) {
-                            // Draw route on map
-                            mapView?.let { map ->
-                                map.clearPolylines()
-                                for (polyline in result.polylines) {
-                                    // Re-create with a visible blue color and thicker width
-                                    val styledPolyline = Polyline(
-                                        points = polyline.points,
-                                        strokeColor = Color(0xFF1976D2),
-                                        strokeWidth = 8f,
-                                    )
-                                    map.addPolyline(styledPolyline)
-                                }
-                                // Center map on start point
-                                map.setCenter(LatLng(startCoord.latitude, startCoord.longitude))
-                                map.setZoom(8.0f)
-                            }
-                            
                             val durationHours = (result.durationSeconds / 3600).toInt()
                             val durationMinutes = ((result.durationSeconds % 3600) / 60).toInt()
                             val distanceKm = result.distanceMeters / 1000.0
@@ -246,9 +229,57 @@ fun RouteControls(
                             var timeStr = ""
                             if (durationHours > 0) timeStr += "${durationHours}h "
                             timeStr += "${durationMinutes}m"
+                            
+                            // Draw route on map
+                            mapView?.let { map ->
+                                map.clearPolylines()
+                                map.clearMarkers() // Clear old weather pins
+                                
+                                for (polyline in result.polylines) {
+                                    val styledPolyline = Polyline(
+                                        points = polyline.points,
+                                        strokeColor = Color(0xFF1976D2),
+                                        strokeWidth = 8f,
+                                    )
+                                    map.addPolyline(styledPolyline)
+                                }
+                                map.setCenter(LatLng(startCoord.latitude, startCoord.longitude))
+                                map.setZoom(8.0f)
+                            }
+                            
+                            // Add Weather Markers
+                            if (Keep.weatherApiKey.isNotBlank()) {
+                                statusText = "Fetching weather for route..."
+                                val weatherPrepper = WeatherPrepper()
+                                val points = result.polylines.first().points
+                                
+                                // Sample checkpoints: 33%, 66%, and Destination (100%)
+                                val fractions = listOf(0.33, 0.66, 1.0)
+                                
+                                for (fraction in fractions) {
+                                    val index = ((points.size - 1) * fraction).toInt()
+                                    val point = points[index]
+                                    val etaSeconds = result.durationSeconds * fraction
+                                    
+                                    val weather = withContext(Dispatchers.IO) {
+                                        weatherPrepper.getWeatherAtETA(point.latitude, point.longitude, etaSeconds)
+                                    }
+                                    
+                                    if (weather != null) {
+                                        val etaHoursStr = String.format(java.util.Locale.US, "%.1fh", weather.etaHours)
+                                        val marker = de.afarber.openmapview.Marker(
+                                            position = point,
+                                            title = "${weather.iconEmoji} ${weather.tempC}°C",
+                                            snippet = "+$etaHoursStr (${weather.condition})"
+                                        )
+                                        mapView?.addMarker(marker)
+                                    }
+                                }
+                            } else {
+                                Toast.makeText(context, "Paste WeatherAPI key in Keep.kt for weather pins", Toast.LENGTH_LONG).show()
+                            }
 
                             statusText = "Route found! $timeStr ($distanceStr)"
-                            //statusText = "Route found! $timeStr ($distanceStr) - ${result.polylines.first().points.size} points"
                         } else {
                             statusText = "No route found"
                         }

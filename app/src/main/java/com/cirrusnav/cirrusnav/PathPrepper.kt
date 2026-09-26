@@ -110,9 +110,9 @@ class PathPrepper {
     }
 
     /**
-     * Geocodes an address using Nominatim (OpenStreetMap's free geocoder).
+     * Geocodes an address using Nominatim
      *
-     * NO API key needed. Rate limited to 1 request/sec.
+     * Rate limited to 1 request/sec.
      * https://nominatim.openstreetmap.org/search
      */
     suspend fun geocode(address: String): GeoCoord? {
