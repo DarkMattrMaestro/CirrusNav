@@ -1,14 +1,13 @@
 package com.cirrusnav.cirrusnav
 
-class GeoCoord {
-    val longitude: Double? = null
-    val latitude: Double? = null
-
-    fun isValid(): Boolean {
-        return longitude != null && latitude != null
-    }
-
-    fun toURLString(): String {
+/**
+ * Represents a geographic coordinate with longitude and latitude.
+ */
+data class GeoCoord(
+    val longitude: Double,
+    val latitude: Double,
+) {
+    override fun toString(): String {
         return "$longitude,$latitude"
     }
 }
