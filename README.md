@@ -3,7 +3,7 @@ Safely travel and account for the unpredictability of weather
 
 ## Tasks (Choose whatever to work on)
 ### MVP
-- [ ] Map
+- [x] Map
       - https://github.com/afarber/OpenMapView
 - [ ] Path to destination
       - (Google Maps or alt?)
