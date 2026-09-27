@@ -1,6 +1,15 @@
 package com.cirrusnav.cirrusnav
 
 import android.util.Log
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import de.afarber.openmapview.GeoJsonParser
 import de.afarber.openmapview.GeoJsonResult
 import io.ktor.client.*
@@ -24,6 +33,34 @@ data class RouteResult(
     val distanceMeters: Double
 )
 
+
+
+private class FakeUser (Coords: GeoCoord){
+    var location = GeoCoord(0.0,0.0)
+        set(value) {
+            field = value
+        }
+
+    init{
+        location = Coords
+    }
+
+
+
+
+    @Composable
+    fun DrawUser(){
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .clip(CircleShape)
+                .background(Color.Green)
+        )
+    }
+
+
+
+}
 class PathPrepper {
     private val client = HttpClient(CIO)
 
