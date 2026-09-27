@@ -141,7 +141,8 @@ class PathPrepper {
                     Keep.k_points = points
                 }
             }
-            
+
+            Keep.routeDurationSeconds = totalDuration
             val result = RouteResult(polylines, totalDuration, totalDistance)
             Log.d(TAG, "Parsed: ${result.polylines.size} polylines, duration=${totalDuration}s")
             result
@@ -211,6 +212,7 @@ class PathPrepper {
         return try {
             // Nominatim returns a JSON array, e.g.:
             // [{"lat":"45.4208777","lon":"-75.6901106","display_name":"Ottawa, ..."}]
+
             val results = org.json.JSONArray(body)
             if (results.length() > 0) {
                 val first = results.getJSONObject(0)

@@ -47,6 +47,7 @@ import de.afarber.openmapview.OnMapClickListener
 import de.afarber.openmapview.OpenMapView
 import de.afarber.openmapview.Polyline
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -176,29 +177,49 @@ fun RouteControls(
     var isLoading by remember { mutableStateOf(false) }
     var statusText by remember { mutableStateOf("Enter start and destination") }
     var lazyMarker by remember { mutableStateOf<Marker?>(null) }
+    val weatherPrepper = remember { WeatherPrepper() }
+    var tapWeatherJob by remember { mutableStateOf<Job?>(null) }
 
     mapView?.setOnMapClickListener { latLng ->
-        val lazyGPSPoint = pathPrepper.GetClosestPoints(GeoCoord(latLng.longitude,latLng.latitude))
+        val lazyGPSPoint = pathPrepper.GetClosestPoints(GeoCoord(latLng.longitude, latLng.latitude))
+            ?: return@setOnMapClickListener
 
-        if (lazyGPSPoint != null){
-
-
-
-            lazyMarker?.let { mapView.removeMarker(it) }
-
-            lazyMarker = mapView.addMarker(Marker(
-                position = lazyGPSPoint,
-                title = "Tapped Location",
-                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)
-
-            )
-
-            )
-
-
-
+        // Estimate arrival time from how far along the route this point is
+        val points = Keep.k_points
+        val index = points.indexOf(lazyGPSPoint)
+        val etaSeconds = if (index >= 0 && points.size > 1){
+            Keep.routeDurationSeconds * index / (points.size - 1)
         }
 
+        else 0.0
+
+        lazyMarker?.let { mapView.removeMarker(it) }
+        lazyMarker = mapView.addMarker(
+            Marker(
+                position = lazyGPSPoint,
+                title = "Loading weather…",
+                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
+            )
+        )
+
+        tapWeatherJob?.cancel()
+        tapWeatherJob = scope.launch {
+            val weather = withContext(Dispatchers.IO) {
+                weatherPrepper.getWeatherAtETA(lazyGPSPoint.latitude, lazyGPSPoint.longitude, etaSeconds)
+            }
+
+            lazyMarker?.let { mapView.removeMarker(it) }
+            lazyMarker = mapView.addMarker(
+                Marker(
+                    position = lazyGPSPoint,
+                    title = weather?.let { "${it.iconEmoji} ${it.tempC}°C" } ?: "Weather unavailable",
+                    snippet = weather?.let {
+                        "+${String.format(Locale.US, "%.1fh", it.etaHours)} (${it.condition})"
+                    },
+                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
+                )
+            )
+        }
     }
 
     Column(
@@ -265,6 +286,7 @@ fun RouteControls(
                         statusText = "Fetching route..."
 
                         // Get route from ORS Directions API
+
                         val result: RouteResult? = withContext(Dispatchers.IO) {
                             pathPrepper.getRoute()
                         }
