@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,6 +37,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import de.afarber.openmapview.GeoJsonResult
 import de.afarber.openmapview.LatLng
@@ -107,6 +110,21 @@ fun MapViewScreen() {
         }
     } else {
         Column(modifier = Modifier.fillMaxSize()) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp,
+                modifier = Modifier.fillMaxWidth()
+                    .zIndex(1f),
+            ) {
+                RouteControls(
+                    mapView = mapView,
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .padding(16.dp),
+                )
+            }
+
+
             AndroidView(
                 factory = { ctx ->
                     OpenMapView(ctx).apply {
@@ -126,15 +144,7 @@ fun MapViewScreen() {
                 modifier = Modifier.weight(1f).fillMaxSize(),
             )
 
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                RouteControls(
-                    mapView = mapView,
-                    modifier = Modifier.padding(16.dp),
-                )
-            }
+
         }
     }
 }
@@ -156,6 +166,7 @@ fun RouteControls(
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
+
     ) {
         Text(
             text = "Route Planner",
@@ -225,16 +236,16 @@ fun RouteControls(
                             val durationMinutes = ((result.durationSeconds % 3600) / 60).toInt()
                             val distanceKm = result.distanceMeters / 1000.0
                             val distanceStr = String.format(java.util.Locale.US, "%.1f km", distanceKm)
-                            
+
                             var timeStr = ""
                             if (durationHours > 0) timeStr += "${durationHours}h "
                             timeStr += "${durationMinutes}m"
-                            
+
                             // Draw route on map
                             mapView?.let { map ->
                                 map.clearPolylines()
                                 map.clearMarkers() // Clear old weather pins
-                                
+
                                 for (polyline in result.polylines) {
                                     val styledPolyline = Polyline(
                                         points = polyline.points,
@@ -246,25 +257,25 @@ fun RouteControls(
                                 map.setCenter(LatLng(startCoord.latitude, startCoord.longitude))
                                 map.setZoom(8.0f)
                             }
-                            
+
                             // Add Weather Markers
                             if (Keep.weatherApiKey.isNotBlank()) {
                                 statusText = "Fetching weather for route..."
                                 val weatherPrepper = WeatherPrepper()
                                 val points = result.polylines.first().points
-                                
+
                                 // Sample checkpoints: 33%, 66%, and Destination (100%)
                                 val fractions = listOf(0.33, 0.66, 1.0)
-                                
+
                                 for (fraction in fractions) {
                                     val index = ((points.size - 1) * fraction).toInt()
                                     val point = points[index]
                                     val etaSeconds = result.durationSeconds * fraction
-                                    
+
                                     val weather = withContext(Dispatchers.IO) {
                                         weatherPrepper.getWeatherAtETA(point.latitude, point.longitude, etaSeconds)
                                     }
-                                    
+
                                     if (weather != null) {
                                         val etaHoursStr = String.format(java.util.Locale.US, "%.1fh", weather.etaHours)
                                         val marker = de.afarber.openmapview.Marker(
