@@ -1,0 +1,22 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory
+        app:key="openrouteservice_category"
+        app:title="OpenRouteService">
+
+    <EditTextPreference
+        app:key="openRouteServiceKey"
+        app:title="OpenRouteService API Key"
+        app:summary="You need your own API key to get route data."/>
+    <Preference
+        app:key="OpenRouteService webpage"
+        app:title="See https://account.heigit.org/manage/key to create a key for OpenRouteService">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="https://account.heigit.org/manage/key" />
+    </Preference>
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

@@ -71,7 +71,14 @@ class PathPrepper {
             throw Exception("ORS returned ${response.status}: ${body.take(200)}")
         }
 
-        Keep.path = GeoJsonParser.parse(body)
+//        Keep.path = GeoJsonParser.(response.bodyAsText())
+
+        try {
+            Keep.path = org.json.JSONObject(body)
+        } catch (e: Exception) {
+            Log.e(TAG, "JSON parse error: ${e.message}", e)
+            throw e
+        }
 
         return try {
             val json = org.json.JSONObject(body)

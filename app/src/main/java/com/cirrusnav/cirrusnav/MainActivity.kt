@@ -1,13 +1,19 @@
 package com.cirrusnav.cirrusnav
 
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.location.Location
 import android.os.Bundle
+import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -19,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Settings
@@ -44,9 +51,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.Popup
+import androidx.core.app.ActivityCompat.startActivityForResult
+import androidx.core.content.ContextCompat.startActivity
 import androidx.core.net.toUri
+import androidx.preference.PreferenceFragmentCompat
+import de.afarber.openmapview.Circle
+import de.afarber.openmapview.CircleOptions
 import de.afarber.openmapview.GeoJsonResult
 import de.afarber.openmapview.LatLng
 import de.afarber.openmapview.Marker
@@ -55,6 +70,7 @@ import de.afarber.openmapview.Polyline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import kotlin.math.min
 
 class MainActivity : ComponentActivity() {
@@ -163,8 +179,52 @@ fun RouteControls(
 
     var startAddress by remember { mutableStateOf("") }
     var destAddress by remember { mutableStateOf("") }
+    var openRouteServiceKey by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var statusText by remember { mutableStateOf("Enter start and destination") }
+
+    var isSettingsOpen by remember { mutableStateOf(false) }
+
+    if (isSettingsOpen) {
+        Dialog(
+            onDismissRequest = { isSettingsOpen = false }
+        ) {
+            Box(
+                Modifier
+                    .background(Color.White, RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp)
+            ) {
+                Column(
+                    modifier = modifier,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "Settings (auto-saves)",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+
+                    OutlinedTextField(
+                        value = openRouteServiceKey,
+                        onValueChange = { openRouteServiceKey = it },
+                        label = { Text("OpenRouteService API Key") },
+                        placeholder = { Text("fh4397...4f7") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Button(
+                        onClick = {
+                            Keep.openRouteServiceKey = openRouteServiceKey
+                            isSettingsOpen = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Exit Settings")
+                    }
+                }
+            }
+        }
+    }
 
     Column(
         modifier = modifier,
@@ -178,7 +238,7 @@ fun RouteControls(
             )
 
             IconButton(
-                onClick = {},
+                onClick = { isSettingsOpen = true },
                 enabled = true,
                 colors = IconButtonDefaults.iconButtonColors(),
                 modifier = Modifier.align(Alignment.CenterVertically)
@@ -214,8 +274,8 @@ fun RouteControls(
 
         Button(
             onClick = {
-                if (Keep.isOpenRouteServiceKeyValid()) {
-                    Toast.makeText(context, "Set your ORS API key in Keep.kt", Toast.LENGTH_LONG).show()
+                if (!Keep.isOpenRouteServiceKeyValid()) {
+                    Toast.makeText(context, "Set your ORS API key in settings", Toast.LENGTH_LONG).show()
                     return@Button
                 }
                 if (startAddress.isBlank() || destAddress.isBlank()) {
@@ -282,37 +342,37 @@ fun RouteControls(
                             // Sample path regularly
                             samplePath(mapView!!)
                             
-                            // Add Weather Markers
-                            if (Keep.weatherApiKey.isNotBlank()) {
-                                statusText = "Fetching weather for route..."
-                                val weatherPrepper = WeatherPrepper()
-                                val points = result.polylines.first().points
-                                
-                                // Sample checkpoints: 33%, 66%, and Destination (100%)
-                                val fractions = listOf(0.33, 0.66, 1.0)
-                                
-                                for (fraction in fractions) {
-                                    val index = ((points.size - 1) * fraction).toInt()
-                                    val point = points[index]
-                                    val etaSeconds = result.durationSeconds * fraction
-                                    
-                                    val weather = withContext(Dispatchers.IO) {
-                                        weatherPrepper.getWeatherAtETA(point.latitude, point.longitude, etaSeconds)
-                                    }
-                                    
-                                    if (weather != null) {
-                                        val etaHoursStr = String.format(java.util.Locale.US, "%.1fh", weather.etaHours)
-                                        val marker = de.afarber.openmapview.Marker(
-                                            position = point,
-                                            title = "${weather.iconEmoji} ${weather.tempC}°C",
-                                            snippet = "+$etaHoursStr (${weather.condition})"
-                                        )
-                                        mapView?.addMarker(marker)
-                                    }
-                                }
-                            } else {
-                                Toast.makeText(context, "Paste WeatherAPI key in Keep.kt for weather pins", Toast.LENGTH_LONG).show()
-                            }
+//                            // Add Weather Markers
+//                            if (Keep.weatherApiKey.isNotBlank()) {
+//                                statusText = "Fetching weather for route..."
+//                                val weatherPrepper = WeatherPrepper()
+//                                val points = result.polylines.first().points
+//
+//                                // Sample checkpoints: 33%, 66%, and Destination (100%)
+//                                val fractions = listOf(0.33, 0.66, 1.0)
+//
+//                                for (fraction in fractions) {
+//                                    val index = ((points.size - 1) * fraction).toInt()
+//                                    val point = points[index]
+//                                    val etaSeconds = result.durationSeconds * fraction
+//
+//                                    val weather = withContext(Dispatchers.IO) {
+//                                        weatherPrepper.getWeatherAtETA(point.latitude, point.longitude, etaSeconds)
+//                                    }
+//
+//                                    if (weather != null) {
+//                                        val etaHoursStr = String.format(java.util.Locale.US, "%.1fh", weather.etaHours)
+//                                        val marker = de.afarber.openmapview.Marker(
+//                                            position = point,
+//                                            title = "${weather.iconEmoji} ${weather.tempC}°C",
+//                                            snippet = "+$etaHoursStr (${weather.condition})"
+//                                        )
+//                                        mapView.addMarker(marker)
+//                                    }
+//                                }
+//                            } else {
+//                                Toast.makeText(context, "Paste WeatherAPI key in Keep.kt for weather pins", Toast.LENGTH_LONG).show()
+//                            }
 
                             statusText = "Route found! $timeStr ($distanceStr)"
                         } else {
@@ -348,12 +408,19 @@ fun RouteControls(
 }
 
 fun samplePath(mapView: OpenMapView) {
-    val samples: ArrayList<LatLng> = ArrayList<LatLng>()
+    val samples: ArrayList<Int> = ArrayList<Int>()
     var lastSampleDist: Float = 0f
-    var sampleStep: Int = 100 // step in meters
+    var sampleStep: Int = 1000 // step in meters
     var distTravelled: Float = 0f
     var lastLatLng: LatLng? = null
-    for (latLng: LatLng in Keep.path?.polylines?.get(0)?.points!!) {
+
+    val features = Keep.path?.getJSONArray("features")
+    val geometry = features?.getJSONObject(0)?.getJSONObject("geometry")
+    val coordinates = geometry?.getJSONArray("coordinates")
+
+    for (i in 0 until coordinates!!.length()) {
+        val coord: JSONArray = coordinates.getJSONArray(i)
+        val latLng: LatLng = LatLng(coord.get(1) as Double, coord.get(0) as Double)
         // Cumulate distance travelled
         if (lastLatLng != null) {
             val distanceRes: FloatArray = FloatArray(1)
@@ -365,12 +432,27 @@ fun samplePath(mapView: OpenMapView) {
         // Check if key point for measurement
         if (lastSampleDist + sampleStep <= distTravelled) {
             lastSampleDist += sampleStep
-            sampleStep = min(sampleStep * 2, 100000)
-            samples.add(latLng)
+            sampleStep = min((sampleStep * 1.5f).toInt(), 40000)
+            samples.add(i)
         }
     }
 
-    for (sample: LatLng in samples) {
-        mapView.addMarker(Marker(sample))
+    for (i: Int in samples) {
+        val coord: JSONArray = coordinates.getJSONArray(i)
+        val sample: LatLng = LatLng(coord.get(1) as Double, coord.get(0) as Double)
+        Log.i("MainActivity", "Pos at ${sample}")
+        mapView.addCircle(
+            Circle(
+                center = sample,
+                radius = 750f,  // Radius in meters
+                strokeColor = Color.Red,
+                strokeWidth = 6f,
+                fillColor = Color.Red,
+                clickable = true,
+                zIndex = 1.5f,
+                tag = "Kotlin Style Circle - 750m"
+            )
+        )
+//        mapView.addMarker(Marker(sample, "AAAAAAA", visible = true))
     }
 }
