@@ -14,7 +14,8 @@ data class WeatherResult(
     val tempC: Double,
     val condition: String,
     val iconEmoji: String,
-    val etaHours: Double
+    val etaHours: Double,
+    val precip_mm: Double,
 )
 
 class WeatherPrepper {
@@ -76,6 +77,7 @@ class WeatherPrepper {
             if (bestHour != null) {
                 val tempC = bestHour.getDouble("temp_c")
                 val conditionText = bestHour.getJSONObject("condition").getString("text")
+                val precipmm: Double = bestHour.getDouble("precip_mm")
                 val isDay = bestHour.optInt("is_day", 1) == 1
                 
                 val emoji = getEmojiForCondition(conditionText, isDay)
@@ -84,7 +86,8 @@ class WeatherPrepper {
                     tempC = tempC,
                     condition = conditionText,
                     iconEmoji = emoji,
-                    etaHours = etaSeconds / 3600.0
+                    etaHours = etaSeconds / 3600.0,
+                    precip_mm = precipmm
                 )
             }
             null

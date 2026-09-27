@@ -34,11 +34,18 @@ class PathPrepper {
      * Fetches a route from ORS Directions API between Keep.startPos and Keep.destPos.
      */
     suspend fun getRoute(): RouteResult? {
-        val start = Keep.startPos ?: run {
+        return getRoute(Keep.startPos, Keep.destPos, true)
+    }
+
+    /**
+     * Fetches a route from ORS Directions API between two positions.
+     */
+    suspend fun getRoute(startPos: LatLng?, destPos: LatLng?, keepPath: Boolean = false): RouteResult? {
+        val start = startPos ?: run {
             Log.e(TAG, "getRoute: startPos is null")
             return null
         }
-        val dest = Keep.destPos ?: run {
+        val dest = destPos ?: run {
             Log.e(TAG, "getRoute: destPos is null")
             return null
         }
@@ -71,23 +78,23 @@ class PathPrepper {
             throw Exception("ORS returned ${response.status}: ${body.take(200)}")
         }
 
-//        Keep.path = GeoJsonParser.(response.bodyAsText())
-
-        try {
-            Keep.path = org.json.JSONObject(body)
-        } catch (e: Exception) {
-            Log.e(TAG, "JSON parse error: ${e.message}", e)
-            throw e
+        if (keepPath) {
+            try {
+                Keep.path = org.json.JSONObject(body)
+            } catch (e: Exception) {
+                Log.e(TAG, "JSON parse error: ${e.message}", e)
+                throw e
+            }
         }
 
         return try {
             val json = org.json.JSONObject(body)
             val features = json.getJSONArray("features")
             val polylines = mutableListOf<de.afarber.openmapview.Polyline>()
-            
+
             var totalDuration = 0.0
             var totalDistance = 0.0
-            
+
             for (i in 0 until features.length()) {
                 val feature = features.getJSONObject(i)
                 val properties = feature.optJSONObject("properties")
