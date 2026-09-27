@@ -1,5 +1,8 @@
 package com.cirrusnav.cirrusnav
 
+import de.afarber.openmapview.GeoJsonResult
+import de.afarber.openmapview.LatLng
+
 /**
  * Global application state for API keys and route parameters.
  *
@@ -17,13 +20,15 @@ object Keep {
     val weatherApiKey = "ad6132620fee479ab0e214447262609"
 
     // TODO: Paste your ORS API key
-    val openRouteServiceKey = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjMyYTVjZWRjY2E5YjQ1NmQ4ZjA4MGJiYTJiZDhiYjU2IiwiaCI6Im11cm11cjY0In0="
+    val openRouteServiceKey: String = ""
 
     fun isOpenRouteServiceKeyValid(): Boolean {
         return openRouteServiceKey.isNotEmpty() && !openRouteServiceKey.contains("&")
     }
 
+    var path: GeoJsonResult? = null
+
     // Mutable route endpoints — set by the UI when user enters addresses
-    var startPos: GeoCoord? = null
-    var destPos: GeoCoord? = null
+    var startPos: LatLng? = null
+    var destPos: LatLng? = null
 }

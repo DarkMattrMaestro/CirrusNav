@@ -2,12 +2,14 @@ package com.cirrusnav.cirrusnav
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.location.Location
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -15,9 +17,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -33,16 +43,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import de.afarber.openmapview.GeoJsonResult
 import de.afarber.openmapview.LatLng
+import de.afarber.openmapview.Marker
 import de.afarber.openmapview.OpenMapView
 import de.afarber.openmapview.Polyline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.min
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -157,10 +170,27 @@ fun RouteControls(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = "Route Planner",
-            style = MaterialTheme.typography.titleMedium,
-        )
+        FlowRow {
+            Text(
+                text = "Route Planner",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.align(Alignment.CenterVertically)
+            )
+
+            IconButton(
+                onClick = {},
+                enabled = true,
+                colors = IconButtonDefaults.iconButtonColors(),
+                modifier = Modifier.align(Alignment.CenterVertically)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Settings,
+                    contentDescription = "Settings",
+                    modifier = Modifier.size(Dp(24f)).align(Alignment.CenterVertically),
+                    tint = if (Keep.isOpenRouteServiceKeyValid()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
+                )
+            }
+        }
 
         OutlinedTextField(
             value = startAddress,
@@ -169,6 +199,7 @@ fun RouteControls(
             placeholder = { Text("e.g. Ottawa, ON") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+            enabled = Keep.isOpenRouteServiceKeyValid()
         )
 
         OutlinedTextField(
@@ -178,11 +209,12 @@ fun RouteControls(
             placeholder = { Text("e.g. Toronto, ON") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
+            enabled = Keep.isOpenRouteServiceKeyValid()
         )
 
         Button(
             onClick = {
-                if (!Keep.isOpenRouteServiceKeyValid()) {
+                if (Keep.isOpenRouteServiceKeyValid()) {
                     Toast.makeText(context, "Set your ORS API key in Keep.kt", Toast.LENGTH_LONG).show()
                     return@Button
                 }
@@ -246,6 +278,9 @@ fun RouteControls(
                                 map.setCenter(LatLng(startCoord.latitude, startCoord.longitude))
                                 map.setZoom(8.0f)
                             }
+
+                            // Sample path regularly
+                            samplePath(mapView!!)
                             
                             // Add Weather Markers
                             if (Keep.weatherApiKey.isNotBlank()) {
@@ -290,7 +325,7 @@ fun RouteControls(
                     isLoading = false
                 }
             },
-            enabled = !isLoading,
+            enabled = !isLoading && Keep.isOpenRouteServiceKeyValid(),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(if (isLoading) "Loading..." else "Get Route")
@@ -309,5 +344,33 @@ fun RouteControls(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+fun samplePath(mapView: OpenMapView) {
+    val samples: ArrayList<LatLng> = ArrayList<LatLng>()
+    var lastSampleDist: Float = 0f
+    var sampleStep: Int = 100 // step in meters
+    var distTravelled: Float = 0f
+    var lastLatLng: LatLng? = null
+    for (latLng: LatLng in Keep.path?.polylines?.get(0)?.points!!) {
+        // Cumulate distance travelled
+        if (lastLatLng != null) {
+            val distanceRes: FloatArray = FloatArray(1)
+            Location.distanceBetween(lastLatLng.latitude, lastLatLng.longitude, latLng.latitude, latLng.longitude, distanceRes)
+            distTravelled += distanceRes[0]
+        }
+        lastLatLng = latLng
+
+        // Check if key point for measurement
+        if (lastSampleDist + sampleStep <= distTravelled) {
+            lastSampleDist += sampleStep
+            sampleStep = min(sampleStep * 2, 100000)
+            samples.add(latLng)
+        }
+    }
+
+    for (sample: LatLng in samples) {
+        mapView.addMarker(Marker(sample))
     }
 }

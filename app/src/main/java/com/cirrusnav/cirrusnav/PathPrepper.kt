@@ -1,13 +1,16 @@
 package com.cirrusnav.cirrusnav
 
+import android.location.Location
 import android.util.Log
 import de.afarber.openmapview.GeoJsonParser
 import de.afarber.openmapview.GeoJsonResult
+import de.afarber.openmapview.LatLng
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import java.net.URLEncoder
+import kotlin.math.min
 
 private const val TAG = "PathPrepper"
 
@@ -68,6 +71,8 @@ class PathPrepper {
             throw Exception("ORS returned ${response.status}: ${body.take(200)}")
         }
 
+        Keep.path = GeoJsonParser.parse(body)
+
         return try {
             val json = org.json.JSONObject(body)
             val features = json.getJSONArray("features")
@@ -115,7 +120,7 @@ class PathPrepper {
      * Rate limited to 1 request/sec.
      * https://nominatim.openstreetmap.org/search
      */
-    suspend fun geocode(address: String): GeoCoord? {
+    suspend fun geocode(address: String): LatLng? {
         if (address.isBlank()) {
             Log.e(TAG, "geocode: address is blank")
             return null
@@ -151,7 +156,7 @@ class PathPrepper {
             val results = org.json.JSONArray(body)
             if (results.length() > 0) {
                 val first = results.getJSONObject(0)
-                val result = GeoCoord(
+                val result = LatLng(
                     longitude = first.getDouble("lon"),
                     latitude = first.getDouble("lat")
                 )
