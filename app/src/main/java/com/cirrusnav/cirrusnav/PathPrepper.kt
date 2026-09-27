@@ -9,9 +9,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import de.afarber.openmapview.GeoJsonParser
 import de.afarber.openmapview.GeoJsonResult
+import de.afarber.openmapview.LatLng
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
@@ -55,6 +57,7 @@ private class FakeUser (Coords: GeoCoord){
                 .size(100.dp)
                 .clip(CircleShape)
                 .background(Color.Green)
+
         )
     }
 
@@ -130,10 +133,12 @@ class PathPrepper {
                         val coord = coordinates.getJSONArray(j)
                         // ORS returns [longitude, latitude]
                         points.add(de.afarber.openmapview.LatLng(coord.getDouble(1), coord.getDouble(0)))
+
                     }
                     if (points.size >= 2) {
                         polylines.add(de.afarber.openmapview.Polyline(points = points))
                     }
+                    Keep.k_points = points
                 }
             }
             
@@ -144,6 +149,27 @@ class PathPrepper {
             Log.e(TAG, "JSON parse error: ${e.message}", e)
             throw e
         }
+    }
+
+
+    fun GetClosestPoints(coords: GeoCoord): LatLng? {
+        val points = Keep.k_points
+        if (points.isEmpty()) {
+            Log.w(TAG, "GetClosestPoints: no route points yet")
+            return null
+        }
+
+        // Longitude degrees shrink toward the poles; scale by cos(lat) so the comparison is fair
+        val cosLat = Math.cos(Math.toRadians(coords.latitude))
+
+        val closest = points.minBy { p ->
+            val dLat = p.latitude - coords.latitude
+            val dLon = (p.longitude - coords.longitude) * cosLat
+            dLat * dLat + dLon * dLon   // squared distance is fine for comparing
+        }
+
+        Log.d(TAG, "Closest point to $coords is $closest")
+        return closest
     }
 
     /**

@@ -26,4 +26,6 @@ object Keep {
     // Mutable route endpoints — set by the UI when user enters addresses
     var startPos: GeoCoord? = null
     var destPos: GeoCoord? = null
+
+    var k_points = mutableListOf<de.afarber.openmapview.LatLng>()
 }
