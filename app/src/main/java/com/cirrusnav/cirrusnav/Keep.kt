@@ -13,6 +13,8 @@ package com.cirrusnav.cirrusnav
  *   - OpenMapView: Uses OpenStreetMap tiles (free, no key)
  */
 object Keep {
+    var routeDurationSeconds = 0.0
+
     // TODO: Paste your WeatherAPI key here
     val weatherApiKey = "ad6132620fee479ab0e214447262609"
 
@@ -26,4 +28,6 @@ object Keep {
     // Mutable route endpoints — set by the UI when user enters addresses
     var startPos: GeoCoord? = null
     var destPos: GeoCoord? = null
+
+    var k_points = mutableListOf<de.afarber.openmapview.LatLng>()
 }

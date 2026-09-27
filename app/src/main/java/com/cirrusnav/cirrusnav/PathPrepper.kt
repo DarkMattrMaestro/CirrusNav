@@ -1,8 +1,19 @@
 package com.cirrusnav.cirrusnav
 
 import android.util.Log
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.dp
 import de.afarber.openmapview.GeoJsonParser
 import de.afarber.openmapview.GeoJsonResult
+import de.afarber.openmapview.LatLng
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
@@ -24,6 +35,35 @@ data class RouteResult(
     val distanceMeters: Double
 )
 
+
+
+private class FakeUser (Coords: GeoCoord){
+    var location = GeoCoord(0.0,0.0)
+        set(value) {
+            field = value
+        }
+
+    init{
+        location = Coords
+    }
+
+
+
+
+    @Composable
+    fun DrawUser(){
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .clip(CircleShape)
+                .background(Color.Green)
+
+        )
+    }
+
+
+
+}
 class PathPrepper {
     private val client = HttpClient(CIO)
 
@@ -93,13 +133,16 @@ class PathPrepper {
                         val coord = coordinates.getJSONArray(j)
                         // ORS returns [longitude, latitude]
                         points.add(de.afarber.openmapview.LatLng(coord.getDouble(1), coord.getDouble(0)))
+
                     }
                     if (points.size >= 2) {
                         polylines.add(de.afarber.openmapview.Polyline(points = points))
                     }
+                    Keep.k_points = points
                 }
             }
-            
+
+            Keep.routeDurationSeconds = totalDuration
             val result = RouteResult(polylines, totalDuration, totalDistance)
             Log.d(TAG, "Parsed: ${result.polylines.size} polylines, duration=${totalDuration}s")
             result
@@ -107,6 +150,27 @@ class PathPrepper {
             Log.e(TAG, "JSON parse error: ${e.message}", e)
             throw e
         }
+    }
+
+
+    fun GetClosestPoints(coords: GeoCoord): LatLng? {
+        val points = Keep.k_points
+        if (points.isEmpty()) {
+            Log.w(TAG, "GetClosestPoints: no route points yet")
+            return null
+        }
+
+        // Longitude degrees shrink toward the poles; scale by cos(lat) so the comparison is fair
+        val cosLat = Math.cos(Math.toRadians(coords.latitude))
+
+        val closest = points.minBy { p ->
+            val dLat = p.latitude - coords.latitude
+            val dLon = (p.longitude - coords.longitude) * cosLat
+            dLat * dLat + dLon * dLon   // squared distance is fine for comparing
+        }
+
+        Log.d(TAG, "Closest point to $coords is $closest")
+        return closest
     }
 
     /**
@@ -148,6 +212,7 @@ class PathPrepper {
         return try {
             // Nominatim returns a JSON array, e.g.:
             // [{"lat":"45.4208777","lon":"-75.6901106","display_name":"Ottawa, ..."}]
+
             val results = org.json.JSONArray(body)
             if (results.length() > 0) {
                 val first = results.getJSONObject(0)

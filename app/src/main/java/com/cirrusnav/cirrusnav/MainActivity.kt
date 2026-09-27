@@ -1,5 +1,6 @@
 package com.cirrusnav.cirrusnav
 
+import android.R
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,14 +37,20 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
-import de.afarber.openmapview.GeoJsonResult
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import de.afarber.openmapview.BitmapDescriptorFactory
 import de.afarber.openmapview.LatLng
+import de.afarber.openmapview.Marker
+import de.afarber.openmapview.OnMapClickListener
 import de.afarber.openmapview.OpenMapView
 import de.afarber.openmapview.Polyline
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,7 +71,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MapViewScreen() {
     val context = LocalContext.current
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var mapView by remember { mutableStateOf<OpenMapView?>(null) }
 
     // Center on Ottawa
@@ -107,6 +115,23 @@ fun MapViewScreen() {
         }
     } else {
         Column(modifier = Modifier.fillMaxSize()) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp,
+                modifier = Modifier.fillMaxWidth()
+                    .zIndex(1f),
+            ) {
+                RouteControls(
+                    mapView = mapView,
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .padding(16.dp),
+                )
+            }
+
+
+
+
             AndroidView(
                 factory = { ctx ->
                     OpenMapView(ctx).apply {
@@ -121,20 +146,17 @@ fun MapViewScreen() {
                             )
                             context.startActivity(intent)
                         }
+
+
+
                     }
+
+
                 },
                 modifier = Modifier.weight(1f).fillMaxSize(),
             )
 
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                RouteControls(
-                    mapView = mapView,
-                    modifier = Modifier.padding(16.dp),
-                )
-            }
+
         }
     }
 }
@@ -143,19 +165,67 @@ fun MapViewScreen() {
 fun RouteControls(
     mapView: OpenMapView?,
     modifier: Modifier = Modifier,
+
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pathPrepper = remember { PathPrepper() }
 
+
     var startAddress by remember { mutableStateOf("") }
     var destAddress by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var statusText by remember { mutableStateOf("Enter start and destination") }
+    var lazyMarker by remember { mutableStateOf<Marker?>(null) }
+    val weatherPrepper = remember { WeatherPrepper() }
+    var tapWeatherJob by remember { mutableStateOf<Job?>(null) }
+
+    mapView?.setOnMapClickListener { latLng ->
+        val lazyGPSPoint = pathPrepper.GetClosestPoints(GeoCoord(latLng.longitude, latLng.latitude))
+            ?: return@setOnMapClickListener
+
+        // Estimate arrival time from how far along the route this point is
+        val points = Keep.k_points
+        val index = points.indexOf(lazyGPSPoint)
+        val etaSeconds = if (index >= 0 && points.size > 1){
+            Keep.routeDurationSeconds * index / (points.size - 1)
+        }
+
+        else 0.0
+
+        lazyMarker?.let { mapView.removeMarker(it) }
+        lazyMarker = mapView.addMarker(
+            Marker(
+                position = lazyGPSPoint,
+                title = "Loading weather…",
+                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
+            )
+        )
+
+        tapWeatherJob?.cancel()
+        tapWeatherJob = scope.launch {
+            val weather = withContext(Dispatchers.IO) {
+                weatherPrepper.getWeatherAtETA(lazyGPSPoint.latitude, lazyGPSPoint.longitude, etaSeconds)
+            }
+
+            lazyMarker?.let { mapView.removeMarker(it) }
+            lazyMarker = mapView.addMarker(
+                Marker(
+                    position = lazyGPSPoint,
+                    title = weather?.let { "${it.iconEmoji} ${it.tempC}°C" } ?: "Weather unavailable",
+                    snippet = weather?.let {
+                        "+${String.format(Locale.US, "%.1fh", it.etaHours)} (${it.condition})"
+                    },
+                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
+                )
+            )
+        }
+    }
 
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
+
     ) {
         Text(
             text = "Route Planner",
@@ -216,6 +286,7 @@ fun RouteControls(
                         statusText = "Fetching route..."
 
                         // Get route from ORS Directions API
+
                         val result: RouteResult? = withContext(Dispatchers.IO) {
                             pathPrepper.getRoute()
                         }
@@ -224,17 +295,18 @@ fun RouteControls(
                             val durationHours = (result.durationSeconds / 3600).toInt()
                             val durationMinutes = ((result.durationSeconds % 3600) / 60).toInt()
                             val distanceKm = result.distanceMeters / 1000.0
-                            val distanceStr = String.format(java.util.Locale.US, "%.1f km", distanceKm)
-                            
+                            val distanceStr = String.format(Locale.US, "%.1f km", distanceKm)
+
                             var timeStr = ""
                             if (durationHours > 0) timeStr += "${durationHours}h "
                             timeStr += "${durationMinutes}m"
-                            
+
                             // Draw route on map
                             mapView?.let { map ->
                                 map.clearPolylines()
                                 map.clearMarkers() // Clear old weather pins
-                                
+                                lazyMarker = null
+
                                 for (polyline in result.polylines) {
                                     val styledPolyline = Polyline(
                                         points = polyline.points,
@@ -246,28 +318,31 @@ fun RouteControls(
                                 map.setCenter(LatLng(startCoord.latitude, startCoord.longitude))
                                 map.setZoom(8.0f)
                             }
-                            
+
+
+
+
                             // Add Weather Markers
                             if (Keep.weatherApiKey.isNotBlank()) {
                                 statusText = "Fetching weather for route..."
                                 val weatherPrepper = WeatherPrepper()
                                 val points = result.polylines.first().points
-                                
+
                                 // Sample checkpoints: 33%, 66%, and Destination (100%)
                                 val fractions = listOf(0.33, 0.66, 1.0)
-                                
+
                                 for (fraction in fractions) {
                                     val index = ((points.size - 1) * fraction).toInt()
                                     val point = points[index]
                                     val etaSeconds = result.durationSeconds * fraction
-                                    
+
                                     val weather = withContext(Dispatchers.IO) {
                                         weatherPrepper.getWeatherAtETA(point.latitude, point.longitude, etaSeconds)
                                     }
-                                    
+
                                     if (weather != null) {
-                                        val etaHoursStr = String.format(java.util.Locale.US, "%.1fh", weather.etaHours)
-                                        val marker = de.afarber.openmapview.Marker(
+                                        val etaHoursStr = String.format(Locale.US, "%.1fh", weather.etaHours)
+                                        val marker = Marker(
                                             position = point,
                                             title = "${weather.iconEmoji} ${weather.tempC}°C",
                                             snippet = "+$etaHoursStr (${weather.condition})"
