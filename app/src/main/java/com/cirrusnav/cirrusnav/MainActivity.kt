@@ -292,6 +292,8 @@ fun RouteControls(
                     return@Button
                 }
 
+                mapView?.clearPolygons()
+
                 isLoading = true
                 statusText = "Geocoding addresses..."
 
@@ -331,24 +333,25 @@ fun RouteControls(
                             if (durationHours > 0) timeStr += "${durationHours}h "
                             timeStr += "${durationMinutes}m"
                             
-//                            // Draw route on map
-//                            mapView?.let { map ->
-//                                map.clearPolylines()
-//                                map.clearMarkers() // Clear old weather pins
-//
-//                                for (polyline in result.polylines) {
-//                                    val styledPolyline = Polyline(
-//                                        points = polyline.points,
-//                                        strokeColor = Color(0xFF1976D2),
-//                                        strokeWidth = 8f,
-//                                    )
-//                                    map.addPolyline(styledPolyline)
-//                                }
-//                                map.setCenter(LatLng(startCoord.latitude, startCoord.longitude))
-//                                map.setZoom(8.0f)
-//                            }
+                            // Draw route on map
+                            mapView?.let { map ->
+                                map.clearPolylines()
+                                map.clearMarkers() // Clear old weather pins
+
+                                for (polyline in result.polylines) {
+                                    val styledPolyline = Polyline(
+                                        points = polyline.points,
+                                        strokeColor = Color(0xFF1976D2),
+                                        strokeWidth = 8f,
+                                    )
+                                    map.addPolyline(styledPolyline)
+                                }
+                                map.setCenter(LatLng(startCoord.latitude, startCoord.longitude))
+                                map.setZoom(8.0f)
+                            }
 
                             // Sample path regularly
+                            statusText = "Fetching weather data..."
                             samplePath(mapView!!)
                             
 //                            // Add Weather Markers
@@ -417,11 +420,13 @@ fun RouteControls(
 }
 
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-suspend fun samplePath(mapView: OpenMapView) {
+suspend fun samplePath(mapView: OpenMapView, ) {
+    val isSmoothed: Boolean = true
 
     val samples: ArrayList<Int> = ArrayList<Int>()
     var lastSampleDist: Float = 0f
     var sampleStep: Int = 1000 // step in meters
+    val maxStep: Int = 20000 // step in meters
     var distTravelled: Float = 0f
     var lastLatLng: LatLng? = null
 
@@ -443,74 +448,96 @@ suspend fun samplePath(mapView: OpenMapView) {
         // Check if key point for measurement
         if (lastSampleDist + sampleStep <= distTravelled) {
             lastSampleDist += sampleStep
-            sampleStep = min((sampleStep * 4f).toInt(), 20000)
+            sampleStep = min((sampleStep * 4f).toInt(), maxStep)
             samples.add(i)
         }
     }
 
-    Log.i("MainActivity", "Completed sampling key points [${samples.size}]: ${samples}")
+//    Log.i("MainActivity", "Completed sampling key points [${samples.size}]: ${samples}")
 
     val weatherAtSample: HashMap<Int, WeatherResult> = HashMap<Int, WeatherResult>()
     // Collect weather data samples
     for (i: Int in samples) {
         val coord: JSONArray = coordinates.getJSONArray(i)
         val sample: LatLng = LatLng(coord.get(1) as Double, coord.get(0) as Double)
-        Log.i("MainActivity", "Pos at ${sample}")
+//        Log.i("MainActivity", "Pos at ${sample}")
 
         val travelTime: Double = PathPrepper().getRoute(Keep.startPos, sample, false)!!.durationSeconds
         val weatherRes: WeatherResult? = WeatherPrepper().getWeatherAtETA(sample.latitude, sample.longitude, travelTime)
         weatherAtSample[i] = weatherRes?: WeatherResult(0.0,"","",0.0,0.0)
     }
 
-    Log.i("MainActivity", "Completed sampling weather data [${weatherAtSample.size}]: ${weatherAtSample}")
+//    Log.i("MainActivity", "Completed sampling weather data [${weatherAtSample.size}]: ${weatherAtSample}")
 
     // Interpolate weather data
-    val rainFactor: Double = 500.0
+//    val rainFactor: Double = 500.0
     val borderPoints: ArrayList<LatLng> = ArrayList<LatLng>()
-//    for (i in 0 until coordinates.length() - 1) {
-    for (i: Int in samples) {
-        val coord: JSONArray = coordinates.getJSONArray(i)
-        val latLng: LatLng = LatLng(coord.get(1) as Double, coord.get(0) as Double)
-        val nextCoord: JSONArray = coordinates.getJSONArray(i+1)
-        val nextLatLng: LatLng = LatLng(nextCoord.get(1) as Double, nextCoord.get(0) as Double)
+    if (isSmoothed) {
+        val smoothStep: Int = 5000
+        var travelled: Float = 0f
+        var lastSmooth: Float = 0f
+        for (i in 0 until coordinates.length() - 1) {
+//    for (i: Int in samples) {
+            val coord: JSONArray = coordinates.getJSONArray(i)
+            val latLng: LatLng = LatLng(coord.get(1) as Double, coord.get(0) as Double)
+            val nextCoord: JSONArray = coordinates.getJSONArray(i + 1)
+            val nextLatLng: LatLng = LatLng(nextCoord.get(1) as Double, nextCoord.get(0) as Double)
 //        Log.i("MainActivity", "Iterating: ${latLng}")
+
+            val distanceResp: FloatArray = FloatArray(1)
+            Location.distanceBetween(
+                nextLatLng.latitude,
+                nextLatLng.longitude,
+                latLng.latitude,
+                latLng.longitude,
+                distanceResp
+            )
+            travelled += distanceResp[0]
+            if (travelled > lastSmooth + smoothStep) {
+                lastSmooth += smoothStep
+            } else {
+                continue
+            }
 //
-//        var below: Int = 0
-//        var belowDist: Int = Int.MAX_VALUE
-//        var above: Int = 0
-//        var aboveDist: Int = Int.MAX_VALUE
-//        for (j in 0 until samples.size) {
-//            Log.i("MainActivity", "Iter: ${i} ${below} ${belowDist}; ${above} ${aboveDist}; ${j} ${samples[j]}")
-//            if (samples[j] > i && samples[j] - i < aboveDist) {
-//                aboveDist = samples[j] - i
-//                above = j
-//            }
-//            if (samples[j] < i && i - samples[j] < aboveDist) {
-//                belowDist = i - samples[j]
-//                below = j
-//            }
-//        }
+            var below: Int = 0
+            var belowDist: Int = Int.MAX_VALUE
+            var above: Int = 0
+            var aboveDist: Int = Int.MAX_VALUE
+            for (j in 0 until samples.size) {
+                Log.i(
+                    "MainActivity",
+                    "Iter: ${i} ${below} ${belowDist}; ${above} ${aboveDist}; ${j} ${samples[j]}"
+                )
+                if (samples[j] > i && samples[j] - i < aboveDist) {
+                    aboveDist = samples[j] - i
+                    above = j
+                }
+                if (samples[j] < i && i - samples[j] < aboveDist) {
+                    belowDist = i - samples[j]
+                    below = j
+                }
+            }
 //
 //        Log.i("MainActivity", "Done: ${i} -> ${samples[below]} ${belowDist}; ${samples[above]} ${aboveDist}")
 //
-//        val distanceRes: FloatArray = FloatArray(1)
-//        Location.distanceBetween(
-//            coordinates.getJSONArray(samples[below]).getDouble(1),
-//            coordinates.getJSONArray(samples[below]).getDouble(0),
-//            coord.getDouble(1),
-//            coord.getDouble(0),
-//            distanceRes
-//        )
-//        val distFromBelow: Float = distanceRes[0]
+            val distanceRes: FloatArray = FloatArray(1)
+            Location.distanceBetween(
+                coordinates.getJSONArray(samples[below]).getDouble(1),
+                coordinates.getJSONArray(samples[below]).getDouble(0),
+                coord.getDouble(1),
+                coord.getDouble(0),
+                distanceRes
+            )
+            val distFromBelow: Float = distanceRes[0]
 //
-//        Location.distanceBetween(
-//            coordinates.getJSONArray(samples[above]).getDouble(1),
-//            coordinates.getJSONArray(samples[above]).getDouble(0),
-//            coord.getDouble(1),
-//            coord.getDouble(0),
-//            distanceRes
-//        )
-//        val distFromAbove: Float = distanceRes[0]
+            Location.distanceBetween(
+                coordinates.getJSONArray(samples[above]).getDouble(1),
+                coordinates.getJSONArray(samples[above]).getDouble(0),
+                coord.getDouble(1),
+                coord.getDouble(0),
+                distanceRes
+            )
+            val distFromAbove: Float = distanceRes[0]
 //
 //        Log.i("MainActivity", "${samples}")
 //        Log.i("MainActivity", "in sample ${below} ${above}")
@@ -524,22 +551,52 @@ suspend fun samplePath(mapView: OpenMapView) {
 //                + weatherAtSample[samples[above]]!!.precip_mm * distFromAbove
 //                ) / (distFromBelow + distFromAbove);
 //
-        val distPoint: Double = (0.02 * weatherAtSample[i]!!.precip_mm)
 
-        val latDiff: Double = nextLatLng.latitude - latLng.latitude;
-        val longDiff: Double = nextLatLng.longitude - latLng.longitude;
-        val length: Double = sqrt(latDiff * latDiff + longDiff * longDiff);
-        val uLat: Double = latDiff / length;
-        val uLong: Double = longDiff / length;
 
-        val newLat1: Double = latLng.latitude + (distPoint / 2) * uLong;
-        val newLong1: Double = latLng.longitude - (distPoint / 2) * uLat;
+            val distPoint: Double = 0.02 * (
+                    weatherAtSample[samples[below]]!!.precip_mm * distFromBelow
+                            + weatherAtSample[samples[above]]!!.precip_mm * distFromAbove
+                    ) / (distFromBelow + distFromAbove)
 
-        val newLat2: Double = latLng.latitude - (distPoint / 2) * uLong;
-        val newLong2: Double = latLng.longitude + (distPoint / 2) * uLat;
+            val latDiff: Double = nextLatLng.latitude - latLng.latitude;
+            val longDiff: Double = nextLatLng.longitude - latLng.longitude;
+            val length: Double = sqrt(latDiff * latDiff + longDiff * longDiff);
+            val uLat: Double = latDiff / length;
+            val uLong: Double = longDiff / length;
 
-        borderPoints.addFirst(LatLng(newLat1, newLong1))
-        borderPoints.addLast(LatLng(newLat2, newLong2))
+            val newLat1: Double = latLng.latitude + (distPoint / 2) * uLong;
+            val newLong1: Double = latLng.longitude - (distPoint / 2) * uLat;
+
+            val newLat2: Double = latLng.latitude - (distPoint / 2) * uLong;
+            val newLong2: Double = latLng.longitude + (distPoint / 2) * uLat;
+
+            borderPoints.addFirst(LatLng(newLat1, newLong1))
+            borderPoints.addLast(LatLng(newLat2, newLong2))
+        }
+    } else {
+        for (i: Int in samples) {
+            val coord: JSONArray = coordinates.getJSONArray(i)
+            val latLng: LatLng = LatLng(coord.get(1) as Double, coord.get(0) as Double)
+            val nextCoord: JSONArray = coordinates.getJSONArray(i + 1)
+            val nextLatLng: LatLng = LatLng(nextCoord.get(1) as Double, nextCoord.get(0) as Double)
+
+            val distPoint: Double = 0.02 * weatherAtSample[i]!!.precip_mm
+
+            val latDiff: Double = nextLatLng.latitude - latLng.latitude;
+            val longDiff: Double = nextLatLng.longitude - latLng.longitude;
+            val length: Double = sqrt(latDiff * latDiff + longDiff * longDiff);
+            val uLat: Double = latDiff / length;
+            val uLong: Double = longDiff / length;
+
+            val newLat1: Double = latLng.latitude + (distPoint / 2) * uLong;
+            val newLong1: Double = latLng.longitude - (distPoint / 2) * uLat;
+
+            val newLat2: Double = latLng.latitude - (distPoint / 2) * uLong;
+            val newLong2: Double = latLng.longitude + (distPoint / 2) * uLat;
+
+            borderPoints.addFirst(LatLng(newLat1, newLong1))
+            borderPoints.addLast(LatLng(newLat2, newLong2))
+        }
     }
 
     Log.i("MainActivity", "borderPoints length: ${borderPoints.size}")
@@ -547,9 +604,9 @@ suspend fun samplePath(mapView: OpenMapView) {
     mapView.addPolygon(
         Polygon(
             points = borderPoints,
-            strokeColor = Color.Green,
-            fillColor = Color(0f, 1f, 0f, 1f),
-            clickable = true,
+            strokeColor = Color(1f, 0f, 0f, 0.0f),
+            fillColor = Color(1f, 0f, 0f, 0.5f),
+            clickable = false,
         )
     )
 
@@ -557,22 +614,22 @@ suspend fun samplePath(mapView: OpenMapView) {
         points = borderPoints,
     ))
 
-    for (i: Int in samples) {
-        val coord: JSONArray = coordinates.getJSONArray(i)
-        val sample: LatLng = LatLng(coord.get(1) as Double, coord.get(0) as Double)
-        Log.i("MainActivity", "Samples[i]: ${i}")
-        Log.i("MainActivity", "Circles Pos at: ${(rainFactor * weatherAtSample[i]!!.precip_mm).toFloat()}")
-        mapView.addCircle(
-            Circle(
-                center = sample,
-                radius = (rainFactor * weatherAtSample[i]!!.precip_mm).toFloat(),  // Radius in meters
-                strokeColor = Color.Red,
-                strokeWidth = 6f,
-                fillColor = Color.Red,
-                clickable = true,
-                zIndex = 1.5f,
-                tag = "Kotlin Style Circle"
-            )
-        )
-    }
+//    for (i: Int in samples) {
+//        val coord: JSONArray = coordinates.getJSONArray(i)
+//        val sample: LatLng = LatLng(coord.get(1) as Double, coord.get(0) as Double)
+//        Log.i("MainActivity", "Samples[i]: ${i}")
+//        Log.i("MainActivity", "Circles Pos at: ${(rainFactor * weatherAtSample[i]!!.precip_mm).toFloat()}")
+//        mapView.addCircle(
+//            Circle(
+//                center = sample,
+//                radius = (rainFactor * weatherAtSample[i]!!.precip_mm).toFloat(),  // Radius in meters
+//                strokeColor = Color.Red,
+//                strokeWidth = 6f,
+//                fillColor = Color.Red,
+//                clickable = true,
+//                zIndex = 1.5f,
+//                tag = "Kotlin Style Circle"
+//            )
+//        )
+//    }
 }
