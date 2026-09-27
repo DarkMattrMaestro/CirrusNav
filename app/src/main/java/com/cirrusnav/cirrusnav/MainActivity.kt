@@ -4,12 +4,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.location.Location
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -66,12 +68,14 @@ import de.afarber.openmapview.GeoJsonResult
 import de.afarber.openmapview.LatLng
 import de.afarber.openmapview.Marker
 import de.afarber.openmapview.OpenMapView
+import de.afarber.openmapview.Polygon
 import de.afarber.openmapview.Polyline
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import kotlin.math.min
+import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -407,6 +411,7 @@ fun RouteControls(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 fun samplePath(mapView: OpenMapView) {
     val samples: ArrayList<Int> = ArrayList<Int>()
     var lastSampleDist: Float = 0f
@@ -436,6 +441,41 @@ fun samplePath(mapView: OpenMapView) {
             samples.add(i)
         }
     }
+
+    val distPoint: Double = 0.02;
+
+    val borderPoints: ArrayList<LatLng> = ArrayList<LatLng>()
+
+    for (i in 0 until coordinates!!.length() - 1) {
+        val coord: JSONArray = coordinates.getJSONArray(i)
+        val latLng: LatLng = LatLng(coord.get(1) as Double, coord.get(0) as Double)
+        val nextCoord: JSONArray = coordinates.getJSONArray(i+1)
+        val nextLatLng: LatLng = LatLng(nextCoord.get(1) as Double, nextCoord.get(0) as Double)
+
+        val latDiff: Double = nextLatLng.latitude - latLng.latitude;
+        val longDiff: Double = nextLatLng.longitude - latLng.longitude;
+        val length: Double = sqrt(latDiff * latDiff + longDiff * longDiff);
+        val uLat: Double = latDiff / length;
+        val uLong: Double = longDiff / length;
+
+        val newLat1: Double = nextLatLng.latitude + (distPoint / 2) * uLong;
+        val newLong1: Double = nextLatLng.longitude - (distPoint / 2) * uLat;
+
+        val newLat2: Double = nextLatLng.latitude - (distPoint / 2) * uLong;
+        val newLong2: Double = nextLatLng.longitude + (distPoint / 2) * uLat;
+
+        borderPoints.addFirst(LatLng(newLat1, newLong1))
+        borderPoints.addLast(LatLng(newLat2, newLong2))
+    }
+
+    mapView.addPolygon(
+        Polygon(
+            points = borderPoints,
+            strokeColor = Color.Green,
+            fillColor = Color(0f, 1f, 0f, 0.5f),
+            clickable = false,
+        )
+    )
 
     for (i: Int in samples) {
         val coord: JSONArray = coordinates.getJSONArray(i)
